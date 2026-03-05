@@ -2,7 +2,7 @@
 set -e
 
 SKILLS_DIR="$HOME/.claude/skills"
-SKILLS=(pipeline research plan implement review bugfix)
+SKILLS=(pipeline research plan implement review bugfix retrospective)
 
 # Colors
 GREEN='\033[0;32m'
@@ -39,6 +39,7 @@ parse_args() {
         echo "  /implement  Implement based on a plan"
         echo "  /review     Code review + build/test"
         echo "  /bugfix     Fix issues from review"
+        echo "  /retrospective Pipeline retrospective + skill improvement"
         exit 0
         ;;
       *)
@@ -133,6 +134,7 @@ install_skills() {
   echo "  /implement  Implement based on a plan"
   echo "  /review     Code review + build/test"
   echo "  /bugfix     Fix issues from review"
+  echo "  /retrospective  Pipeline retrospective + skill improvement"
 }
 
 # Main

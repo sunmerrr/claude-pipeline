@@ -84,6 +84,7 @@ Implementer가 태스크를 완료할 때마다 `progress.md`를 갱신합니다
 | `/implement` | 플랜 기반 구현 | O |
 | `/review` | 코드 리뷰 + 빌드/테스트 | O |
 | `/bugfix` | 리뷰 기반 버그 수정 | O |
+| `/retrospective` | 파이프라인 회고 + 스킬 자동 개선 | O |
 
 각 스킬은 `/pipeline` 없이도 독립적으로 사용할 수 있습니다.
 
@@ -180,7 +181,7 @@ Retrospective  → retrospective.md
 Individual skills can also be used standalone:
 
 ```
-/research  →  /plan  →  /implement  →  /review  →  /bugfix
+/research  →  /plan  →  /implement  →  /review  →  /bugfix  →  /retrospective
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute new skills or improvements.

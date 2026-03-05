@@ -83,6 +83,7 @@ Refer to the existing skills for examples:
 - [`skills/implement/SKILL.md`](skills/implement/SKILL.md) — plan-driven implementation
 - [`skills/review/SKILL.md`](skills/review/SKILL.md) — build, test, and code review
 - [`skills/bugfix/SKILL.md`](skills/bugfix/SKILL.md) — targeted issue resolution
+- [`skills/retrospective/SKILL.md`](skills/retrospective/SKILL.md) — pipeline retrospective + self-improvement
 
 ---
 
@@ -93,7 +94,7 @@ Format: `type(scope): description`
 | Field | Values |
 |-------|--------|
 | `type` | `feat`, `fix`, `docs`, `refactor` |
-| `scope` | Skill name: `pipeline`, `research`, `plan`, `implement`, `review`, `bugfix` |
+| `scope` | Skill name: `pipeline`, `research`, `plan`, `implement`, `review`, `bugfix`, `retrospective` |
 
 **Examples:**
 

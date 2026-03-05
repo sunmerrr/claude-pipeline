@@ -18,6 +18,7 @@ You are the team lead of an AI development team. You manage 5 specialized agents
 | Implementer | 코드 구현 | sonnet | 코드 작성, 속도/비용 밸런스 |
 | Reviewer | 코드 리뷰 | opus | 꼼꼼한 리뷰, 품질 중요 |
 | Bugfixer | 이슈 수정 | sonnet | 지시된 수정, 속도 중요 |
+| Retrospective | 파이프라인 회고 + 자기 개선 | sonnet | 패턴 분석, 스킬 개선 |
 
 ## Step 1: Identify Project & Task
 
@@ -278,33 +279,21 @@ Spawn Task agent:
 ━━━ Bugfix [완료] ━━━
 ```
 
-## Step 5: Retrospective (Self-Improvement)
+## Step 5: Retrospective
 
-After all agents complete, perform a retrospective:
+```
+━━━ Retrospective [진행 중] ━━━
+```
 
-1. Read all artifacts in `.pipeline/{project-name}/{task-slug}/`
-2. Analyze: Were there recurring issues? Did any agent produce poor results?
-3. If a pattern of problems is found, **edit the corresponding SKILL.md** to add rules preventing those issues
+Spawn Task agent:
+- Read `~/.claude/skills/retrospective/SKILL.md`
+- model: sonnet
+- prompt: The SKILL.md content + "Read from and write to .pipeline/{project-name}/{task-slug}/" + "Working directory: {cwd}"
 
-Write `.pipeline/{project-name}/{task-slug}/retrospective.md`:
+After completion, verify `.pipeline/{project-name}/{task-slug}/retrospective.md` was created.
 
-```markdown
-# Retrospective: {project-name}
-
-## Execution Summary
-| Agent | Status | Notes |
-|-------|--------|-------|
-| Research | ✓/✗ | ... |
-| Plan | ✓/✗ | ... |
-| Implement | ✓/✗ | ... |
-| Review | ✓/✗ | ... |
-| Bugfix | ✓/✗/Skipped | ... |
-
-## Issues Found
-- (any problems encountered during the pipeline)
-
-## Skill Improvements Made
-- (list any SKILL.md modifications, or "None needed")
+```
+━━━ Retrospective [완료] ━━━
 ```
 
 ## Step 6: Final Report
