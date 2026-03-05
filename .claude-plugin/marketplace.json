@@ -1,0 +1,20 @@
+{
+  "name": "sunmerrr-claude-pipeline",
+  "owner": {
+    "name": "sunmerrr"
+  },
+  "metadata": {
+    "description": "AI development pipeline with specialized agents"
+  },
+  "plugins": [
+    {
+      "name": "claude-pipeline",
+      "source": "./",
+      "description": "AI development pipeline — research, plan, implement, review, and bugfix",
+      "version": "1.0.0",
+      "homepage": "https://github.com/sunmerrr/claude-pipeline",
+      "license": "MIT",
+      "keywords": ["pipeline", "agents", "development", "workflow", "automation"]
+    }
+  ]
+}

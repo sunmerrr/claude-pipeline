@@ -1,5 +1,8 @@
 # claude-pipeline
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Claude Code](https://img.shields.io/badge/Claude_Code-Skills-blueviolet)
+
 Claude Code 커스텀 스킬 기반 AI 개발 파이프라인.
 
 `/pipeline`을 실행하면 팀장 역할의 AI가 전문 에이전트들을 순서대로 디스패치해서 리서치부터 구현, 리뷰, 버그 수정까지 자동으로 처리합니다.
@@ -22,7 +25,7 @@ Claude Code 커스텀 스킬 기반 AI 개발 파이프라인.
 각 에이전트는 격리된 서브프로세스로 실행되고, `.pipeline/` 디렉토리의 마크다운 파일로 소통합니다.
 
 ## 에이전트 팀
-
+<!-- Bugfixer는 haiku가 하는거 아니었나? 확인하고 수저해야해 -->
 | Agent | Role | Model | Specialty |
 |-------|------|-------|-----------|
 | Web Researcher | 웹 검색 + 정보 수집 | haiku | 빠르고 저렴한 정보 수집 |
@@ -33,7 +36,7 @@ Claude Code 커스텀 스킬 기반 AI 개발 파이프라인.
 | Bugfixer | 이슈 수정 | sonnet | 지시된 수정, 속도 중요 |
 
 ## 주요 기능
-
+<!-- 팀장 AI 라고 해줘용 아니면 매니저 라던가, 리더? 좀 더 꼰대같지 않은 워딩이 좋을 것 같아요(로컬에서는 괜찮아요) -->
 ### 팀장의 자율 판단
 
 Decision Matrix는 기본 가이드라인일 뿐, 팀장이 상황에 따라 단계를 건너뛰거나 조정합니다.
@@ -91,16 +94,17 @@ Implementer가 태스크를 완료할 때마다 `progress.md`를 갱신합니다
 `~/.claude/skills/` 디렉토리에 각 스킬 폴더를 복사합니다.
 
 ```bash
-# 레포 클론
 git clone https://github.com/sunmerrr/claude-pipeline.git
+cd claude-pipeline
+./install.sh
+```
 
-# 스킬 디렉토리로 복사
-cp -r claude-pipeline/pipeline ~/.claude/skills/
-cp -r claude-pipeline/research ~/.claude/skills/
-cp -r claude-pipeline/plan ~/.claude/skills/
-cp -r claude-pipeline/implement ~/.claude/skills/
-cp -r claude-pipeline/review ~/.claude/skills/
-cp -r claude-pipeline/bugfix ~/.claude/skills/
+### 플러그인 마켓플레이스 (Plugin Marketplace)
+
+Claude Code에서 직접 설치:
+
+```bash
+/plugin marketplace add sunmerrr/claude-pipeline
 ```
 
 ### 권장 Permission 설정
@@ -164,3 +168,43 @@ Bugfixer       → 코드 수정 (review.md 참조)
                         ↓
 Retrospective  → retrospective.md
 ```
+
+---
+
+## English Quick Start
+
+**claude-pipeline** is a set of Claude Code custom skills that orchestrate an AI development team — from research and planning through implementation, review, and bugfix — all driven by a pipeline leader agent.
+
+**Install:**
+
+```bash
+git clone https://github.com/sunmerrr/claude-pipeline.git
+cd claude-pipeline
+./install.sh
+```
+
+**Basic usage in Claude Code:**
+
+```
+/pipeline add user authentication with OAuth2
+```
+
+Individual skills can also be used standalone:
+
+```
+/research  →  /plan  →  /implement  →  /review  →  /bugfix
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute new skills or improvements.
+
+---
+
+## Contributing
+
+Contributions are welcome! Whether you want to fix a bug, improve an existing skill, or add a new one, please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.

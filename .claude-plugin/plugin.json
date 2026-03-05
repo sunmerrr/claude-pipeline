@@ -1,0 +1,11 @@
+{
+  "name": "claude-pipeline",
+  "version": "1.0.0",
+  "description": "AI development pipeline with specialized agents — research, plan, implement, review, and bugfix",
+  "author": {
+    "name": "sunmerrr"
+  },
+  "homepage": "https://github.com/sunmerrr/claude-pipeline",
+  "repository": "https://github.com/sunmerrr/claude-pipeline",
+  "license": "MIT"
+}
