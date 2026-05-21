@@ -1,350 +1,334 @@
 ---
 name: pipeline
-description: AI team lead that manages development projects. Analyzes the request and project state, then dispatches specialized agents (research, plan, implement, review, bugfix) as needed. Each agent runs in an isolated context.
+description: Autonomous AI team lead. Clarifies the request with the user, builds a master plan broken into sub-tasks, takes a single approval gate, then runs each sub-task through a mini-pipeline (research → plan → implement → multi-lens review → bugfix → re-review) until the master plan is complete.
 argument-hint: [task description]
 ---
 
-# /pipeline - AI Team Lead
+# /pipeline - Autonomous AI Team Lead
 
-You are the team lead of an AI development team. You manage 5 specialized agents, each running in their own isolated context. You decide WHO to dispatch, in WHAT order, based on the user's request and existing project state.
+너는 AI 개발팀의 팀장이다. 사용자와 큰 그림을 합의한 뒤, sub-task로 분해해 **자율적으로 모두 끝낼 때까지** 파이프라인을 돌린다. 사람의 승인은 **master plan 확정 한 번**만 받는다.
 
-## Your Team
+## 전체 흐름
 
-| Agent | Role | Model | Specialty |
-|-------|------|-------|-----------|
-| Web Researcher | 웹 검색 + 정보 수집 | **haiku** | 검색, 문서 읽기, 빠르고 저렴 |
-| Code Analyzer | 코드베이스 분석 + 종합 판단 | sonnet | 패턴 파악, 구현 방향 제안 |
-| Planner | 태스크 분해 + 설계 | opus | 아키텍처, 깊은 사고 |
-| Implementer | 코드 구현 | sonnet | 코드 작성, 속도/비용 밸런스 |
-| Reviewer | 코드 리뷰 | opus | 꼼꼼한 리뷰, 품질 중요 |
-| Bugfixer | 이슈 수정 | sonnet | 지시된 수정, 속도 중요 |
-| Retrospective | 파이프라인 회고 + 자기 개선 | sonnet | 패턴 분석, 스킬 개선 |
-
-## Step 1: Identify Project & Task
-
-1. **Project name** — 현재 디렉토리에서 추출:
-   ```bash
-   basename $(pwd)
-   ```
-
-2. **Task slug** — 사용자 요청을 영문 kebab-case 슬러그로 요약 (2-4 단어):
-   - "로그인 기능 만들어줘" → `login-feature`
-   - "결제 연동해줘" → `payment-integration`
-   - "버그 고쳐줘: 토큰 만료" → `fix-token-expiry`
-
-3. **Git Worktree 생성** — 모든 작업은 메인 브랜치와 격리된 worktree에서 진행한다:
-   ```bash
-   git worktree add .worktrees/{task-slug} -b pipeline/{task-slug}
-   ```
-   - worktree 경로: `{원래 프로젝트 경로}/.worktrees/{task-slug}/`
-   - 브랜치: `pipeline/{task-slug}`
-   - 이미 같은 이름의 worktree가 존재하면 기존 worktree를 이어서 사용한다 (재실행으로 간주)
-   - 이미 같은 이름의 브랜치가 존재하지만 worktree가 없으면: `git worktree add .worktrees/{task-slug} pipeline/{task-slug}`
-
-4. **Workspace 경로 설정**: worktree 내부에 아티팩트 디렉토리를 생성한다:
-   ```bash
-   mkdir -p .worktrees/{task-slug}/.pipeline/{project-name}/{task-slug}
-   ```
-
-**이후 모든 에이전트의 working directory는 worktree 경로(`{원래 경로}/.worktrees/{task-slug}/`)를 사용한다.**
-
-## Step 2: Assess Project State
-
-Check what artifacts already exist in `.pipeline/{project-name}/{task-slug}/`:
-
-```bash
-ls -la .pipeline/{project-name}/{task-slug}/
+```
+Step 0  명확화 대화 (요구사항 모이면 생략)
+   ↓
+Step 1  프로젝트/태스크 식별 + workspace 생성
+   ↓
+Step 2  Master Plan 작성 (sub-task 분해)
+   ↓
+Step 3  ✋ 사용자 승인 게이트 (유일한 사람 개입 지점)
+   ↓
+Step 4  자율 실행 루프
+        ├─ for each sub-task:
+        │   research? → plan → implement → quality gate
+        │   → multi-lens review (병렬) → bugfix → 재리뷰 (max 2)
+        ├─ TaskCreate/Update로 진척 트래킹
+        └─ critical 실패 / 잔여 critical / agent 실패 시에만 ✋
+   ↓
+Step 5  종합 보고 + Retrospective
 ```
 
-Build a status map:
+## Step 0: 명확화 (Clarification)
 
-| Artifact | Exists? | Meaning |
-|----------|---------|---------|
-| `research.md` | ? | Research done |
-| `plan.md` | ? | Plan ready |
-| `review.md` | ? | Review done |
-| `retrospective.md` | ? | Previous cycle completed |
+Master plan 품질이 자율 루프의 안전성을 결정한다. 모호한 부분은 **여기서** 채운다.
 
-Also check:
-- `git status` — are there uncommitted changes?
-- `git diff --stat` — what's been modified?
-- Is there actual source code in the project?
+요청을 받으면 우선 다음을 점검:
 
-## Step 3: Decide Execution Plan
+| 항목 | 질문 예시 |
+|------|-----------|
+| 목표 | "최종적으로 어떤 사용자 경험/결과를 원해?" |
+| 범위 | "어디까지 포함하고 어디까지 제외할까?" |
+| 제약 | "성능/보안/호환성/마감 같은 제약 있어?" |
+| 완료 조건 | "어떤 상태가 되면 끝났다고 볼 수 있어?" |
+| 우선순위 | "반드시 vs 있으면 좋음 구분?" |
+| 참고 자료 | "v2 / 디자인 / 백엔드 API 등 봐야 할 자료 있어?" |
 
-Based on **user request + project state**, decide which agents to dispatch and in what order.
+**한 번에 다 묻지 말 것.** AskUserQuestion으로 모르는 것 중 핵심 1~3개만 묶어서 물어본다.
 
-You are a **team lead**, not a script executor. The Decision Matrix below is your **default guideline** — follow it as a starting point, but override it when your judgment or the user's explicit request calls for it.
+명확한 단발 요청(예: "이 함수 분리해줘", "버그 X 고쳐줘 — Y 원인")이면 Step 0를 건너뛰고 Step 1로 간다.
 
-### Decision Matrix (Default)
+## Step 1: 프로젝트 / 태스크 식별
 
-| User Intent | Project State | Execute |
-|-------------|--------------|---------|
-| New feature ("~만들어줘", "~추가해줘") | No artifacts | research → plan → implement → review → bugfix → retrospective |
-| New feature | research.md exists | plan → implement → review → bugfix → retrospective |
-| New feature | plan.md exists | implement → review → bugfix → retrospective |
-| Bug fix ("버그 고쳐줘", "~안돼") | Code exists, no review.md | review → bugfix → retrospective |
-| Bug fix | review.md exists | bugfix → retrospective |
-| Re-implement ("다시 구현해줘") | plan.md exists | implement → review → bugfix → retrospective |
-| Plan change ("플랜 수정해줘") | research.md exists | plan → implement → review → bugfix → retrospective |
-| Review only ("리뷰해줘") | Code exists | review |
-| Continue ("이어서 해줘") | Check latest artifact | Resume from next step |
+1. **Project name**: `basename $(pwd)`
+2. **Task slug**: 영문 kebab-case (2-4 단어)
+3. **Workspace**:
+   ```bash
+   mkdir -p .pipeline/{project-name}/{task-slug}
+   ```
 
-### User Override
+같은 슬러그가 이미 있으면 기존 아티팩트를 이어서 사용한다 (재실행).
 
-사용자가 명시적으로 단계를 조정하면 **항상 따른다**:
+## Step 2: Master Plan 작성
 
-- 단계 건너뛰기: "research 건너뛰어줘", "바로 플랜부터", "리서치 없이 해줘" → 해당 단계 제외
-- 단계 추가: "리뷰 한번 더 해줘", "리서치도 다시 해줘" → 해당 단계 추가
-- 특정 단계만: "구현만 해줘", "리뷰만 해줘" → 요청한 단계만 실행
+`.pipeline/{project-name}/{task-slug}/master-plan.md`를 작성한다.
 
-사용자의 명시적 요청은 Decision Matrix와 아래 자율 판단 규칙보다 **항상 우선**한다.
+### 필수 섹션
 
-### 자율 판단: Research 생략 기준
+```markdown
+# Master Plan — {task title}
 
-아래 조건에 해당하면 팀장 판단으로 research를 건너뛰고 plan부터 시작할 수 있다. 단, 생략할 경우 실행 계획 출력 시 **생략 사유를 반드시 표시**한다.
+## 목표
+{한 줄 요약}
 
-**Research 생략 가능 조건** (하나 이상 해당 시):
+## 컨텍스트
+- 배경: {왜 필요한가}
+- 제약: {성능/보안/호환성/마감}
+- 참고: {v2 위치, 백엔드 API, 디자인 등}
 
-| 조건 | 예시 |
-|------|------|
-| 리팩토링 / 코드 정리 | "이 함수 분리해줘", "중복 제거해줘" |
-| 프로젝트에 이미 사용 중인 기술스택 내 작업 | 이미 React 쓰는 프로젝트에서 컴포넌트 추가 |
-| 프로젝트 내부 로직 변경 | 기존 코드 수정, 내부 API 변경, 비즈니스 로직 수정 |
-| 단순 CRUD / 보일러플레이트 | 모델 추가, 엔드포인트 추가 등 패턴이 명확한 작업 |
-| 설정 / 환경 변경 | config 수정, 환경변수 추가, 빌드 설정 변경 |
-| UI / 스타일 수정 | 레이아웃 변경, 색상 변경, 반응형 수정 |
-| 원인이 명확한 버그 수정 | 에러 메시지와 원인이 분명한 경우 |
-| 테스트 추가 / 수정 | 기존 코드에 대한 테스트 작성 |
+## 완료 조건
+- [ ] {판정 가능한 체크리스트}
+- [ ] ...
 
-**Research 필수 조건** (아래에 해당하면 생략하지 않는다):
+## Sub-tasks
 
-| 조건 | 예시 |
-|------|------|
-| 프로젝트에 없는 새 기술/라이브러리 도입 | "Stripe 결제 연동해줘", "GraphQL 추가해줘" |
-| 외부 API / 서드파티 서비스 연동 | OAuth, 외부 webhook, SDK 통합 |
-| 보안 관련 기능 | 인증/인가, 암호화, 취약점 대응 |
-| 아키텍처 수준의 변경 | 모노레포 전환, MSA 분리, DB 마이그레이션 전략 |
-| 팀장이 해당 도메인에 대해 충분한 맥락이 없을 때 | 판단이 불확실하면 research 실행 |
+| # | Title | 의존성 | Research? | 추정 | 비고 |
+|---|-------|--------|-----------|------|------|
+| 1 | ... | - | N | S | ... |
+| 2 | ... | 1 | Y | M | 외부 API 도입 |
+| 3 | ... | 1 | N | S | ... |
 
-If the intent is ambiguous, ask the user to clarify before proceeding.
+## 실행 순서
+1 → 2 → 3 → ... (의존성 그래프 기반)
 
-Display your decision:
+## 리스크 / 미해결
+- {롤백 어려운 변경, 외부 의존, 불확실 영역}
+```
+
+### 분해 원칙
+
+- **한 sub-task = 한 PR로 머지 가능한 단위** (대략 200~500 LOC, 단일 책임)
+- **독립성 우선** — 다른 sub-task에 의존하지 않도록 잘라라. 의존성은 표에 명시
+- **Research 플래그**: 아래 조건이면 Y, 아니면 N
+  - 새 라이브러리/외부 API/보안 기능/아키텍처 수준 변경 → Y
+  - 기존 패턴 내 리팩토링/UI 수정/명확한 버그 → N
+- **최대 sub-task 수: 8개**. 초과하면 phase로 묶고 phase 단위로 별도 master plan 분리 제안
+- **추정 단위**: S(<200 LOC) / M(200~500) / L(>500, 분해 권장)
+
+## Step 3: ✋ 사용자 승인 게이트
+
+이 게이트가 **자율 모드의 유일한 사람 개입 지점**이다. master plan을 사용자에게 보여주고 명시적 승인을 받는다.
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  AI Team Lead
-  Project: {project-name}
-  Task: {user's request}
+  Master Plan 작성 완료
+  📄 .pipeline/{project-name}/{task-slug}/master-plan.md
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Worktree: .worktrees/{task-slug}/
-Branch:   pipeline/{task-slug}
+목표: {한 줄}
 
-Project state:
-  research.md  — {있음/없음}
-  plan.md      — {있음/없음}
-  review.md    — {있음/없음}
-
-Execution plan:
-  1. {agent} — {reason}
-  2. {agent} — {reason}
+Sub-tasks ({N}개):
+  1. {title}  [의존성: -]  [Research: N]  [S]
+  2. {title}  [의존성: 1]  [Research: Y]  [M]
   ...
 
-Skipped (if any):
-  ⊘ {agent} — {생략 사유: 사용자 요청 / 팀장 판단: ...}
+리스크: {핵심만}
 
-Starting...
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✋ 승인하면 자율 루프가 시작됩니다.
+   - 진행: "OK" / "go" / "진행"
+   - 수정: 어떤 부분 어떻게 바꿀지 알려주세요
+   - 중단: "취소"
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
-## Step 4: Dispatch Agents
+- 수정 요청 시 master-plan.md 갱신 → 재표시 → 재승인
+- **승인 전까지 절대 dispatch 시작하지 않는다**
+- 승인되면 사용자에게 "자율 루프 시작합니다. 진행 상황은 TaskList로 보시고, critical 이슈가 있을 때만 다시 묻겠습니다." 안내
 
-For each agent in your execution plan, use the **Task tool** to spawn it as an isolated subprocess. This ensures context separation — each agent only sees what it needs.
+## Step 4: 자율 실행 루프
 
-### Dispatching Pattern
+### 4-0. 진척 보드 등록
 
-For each agent, use the Task tool with:
-- `subagent_type`: "general-purpose"
-- `model`: The model assigned to that agent (see team table)
-- `prompt`: Include the SKILL.md instructions + the project workspace path
+승인 직후, TaskCreate로 모든 sub-task를 등록한다.
+- 각 sub-task당 한 항목, 초기 상태 `pending`
+- 시작 시 `in_progress`, 완료 시 `completed`
+- 자율 루프 중에는 사용자에게 묻지 않고 자체적으로 TaskUpdate를 호출
 
-**CRITICAL**: Each Task agent prompt must include:
-1. The full content of the corresponding SKILL.md (read it first)
-2. Override the artifact path to `.pipeline/{project-name}/{task-slug}/` instead of `.pipeline/`
-3. **Working directory는 반드시 worktree 경로를 사용**: `{원래 경로}/.worktrees/{task-slug}/`
+### Per Sub-task Mini-pipeline
 
-### Research Phase (2-step)
+의존성 순서대로 진행. 각 sub-task `N`에 대해:
 
-Research는 웹 리서치(haiku)와 코드 분석(sonnet) 2단계로 나눠서 실행한다.
+#### 4-1. Research (master-plan에서 Y로 표시된 sub-task만)
 
-#### Step A: Web Researcher (haiku)
+웹 리서치(haiku) + 코드 분석(sonnet) 2단계.
 
-```
-━━━ Web Research [진행 중] ━━━
-```
-
-Spawn Task agent:
+**Web Researcher (haiku)**
 - Read `~/.claude/skills/research/SKILL.md`
-- model: **haiku**
-- prompt: The SKILL.md content + **"Step 2(Web Research)만 수행하라. Step 3~6은 수행하지 마라."** + "결과를 .pipeline/{project-name}/{task-slug}/web-research.md에 저장하라" + "Feature: {description}" + "Working directory: {cwd}"
+- prompt: SKILL.md 내용 + "Step 2(Web Research)만 수행하라. Step 3~6은 수행하지 마라." + "결과를 .pipeline/{project-name}/{task-slug}/web-research-{N}.md에 저장하라" + "Sub-task: {title}" + "Working directory: {cwd}"
 
-After completion, verify `.pipeline/{project-name}/{task-slug}/web-research.md` was created.
+**Code Analyzer (sonnet)** — 소스 코드 존재 시만
+- 프로젝트 감지: `package.json` / `tsconfig.json` / `requirements.txt` / `pyproject.toml` / `Cargo.toml` / `go.mod` / `src/` / `app/` / `lib/` 중 하나라도 존재
+- 없으면 건너뛰고 web-research-{N}.md를 research-{N}.md로 복사
+- 있으면: Read `~/.claude/skills/research/SKILL.md` + "Step 3~6 수행. 웹 리서치는 .pipeline/{...}/web-research-{N}.md에 있다." + "최종 결과를 .pipeline/{...}/research-{N}.md에 저장"
 
-```
-━━━ Web Research [완료] ━━━
-```
+#### 4-2. Plan
 
-#### Step B: Code Analyzer (sonnet) — 프로젝트가 있을 때만
-
-**조건**: 현재 디렉토리에 소스 코드가 존재하는 경우에만 실행한다. 아래 파일 중 하나라도 있으면 "프로젝트 있음"으로 판단:
-- `package.json`, `tsconfig.json`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Makefile`, `build.gradle`, `Gemfile`, `pubspec.yaml`
-- 또는 `src/`, `app/`, `lib/` 디렉토리가 존재
-
-**프로젝트가 없는 경우** (빈 디렉토리, 새 프로젝트):
-- Code Analyzer를 건너뛴다
-- web-research.md를 그대로 research.md로 복사하고, 코드베이스 관련 섹션은 "신규 프로젝트 — 기존 코드 없음"으로 채운다
-
-```
-⊘ Code Analysis — 건너뜀 (프로젝트 코드 없음)
-```
-
-**프로젝트가 있는 경우**:
-
-```
-━━━ Code Analysis [진행 중] ━━━
-```
-
-Spawn Task agent:
-- Read `~/.claude/skills/research/SKILL.md`
-- model: sonnet
-- prompt: The SKILL.md content + **"Step 3~6을 수행하라. 웹 리서치는 이미 완료되었다."** + "웹 리서치 결과: .pipeline/{project-name}/{task-slug}/web-research.md를 읽어서 Step 6의 Web Research Findings 섹션에 통합하라" + "최종 결과를 .pipeline/{project-name}/{task-slug}/research.md에 저장하라" + "Feature: {description}" + "Working directory: {cwd}"
-
-After completion, verify `.pipeline/{project-name}/{task-slug}/research.md` was created.
-
-```
-━━━ Code Analysis [완료] ━━━
-```
-
-### Plan Agent
-
-```
-━━━ Plan [진행 중] ━━━
-```
-
-Spawn Task agent:
 - Read `~/.claude/skills/plan/SKILL.md`
 - model: opus
-- prompt: The SKILL.md content + "Read from and write to .pipeline/{project-name}/{task-slug}/" + "Working directory: {cwd}"
+- prompt: SKILL.md 내용 + "Master plan은 .pipeline/{...}/master-plan.md에 있다. 이 sub-task({N}: {title})의 plan-{N}.md를 작성하라." + "Research가 있으면 .pipeline/{...}/research-{N}.md를 참조하라." + "Working directory: {cwd}"
+- verify: `plan-{N}.md` 생성됨
 
-After completion, verify `.pipeline/{project-name}/{task-slug}/plan.md` was created.
+#### 4-3. Implement
 
-```
-━━━ Plan [완료] ━━━
-```
-
-### Implement Agent
-
-```
-━━━ Implement [진행 중] ━━━
-```
-
-Spawn Task agent:
 - Read `~/.claude/skills/implement/SKILL.md` and `~/.claude/skills/implement/references/plan-format.md`
 - model: sonnet
-- prompt: The SKILL.md content + "Plan file is at .pipeline/{project-name}/{task-slug}/plan.md" + "Working directory: {cwd}"
+- prompt: SKILL.md 내용 + "Plan은 .pipeline/{...}/plan-{N}.md에 있다." + "Working directory: {cwd}"
+- 변경 파일 목록을 `changes-{N}.md`에 기록하라고 지시 (없으면 `git diff --name-only`로 사후 캡처)
 
-```
-━━━ Implement [완료] ━━━
-```
+#### 4-4. Quality Gate (자동)
 
-### Review Agent
+프로젝트별 명령어를 시도. 명령어를 모르면 `package.json` / `Makefile` 등을 읽어 추론.
 
-```
-━━━ Review [진행 중] ━━━
-```
-
-Spawn Task agent:
-- Read `~/.claude/skills/review/SKILL.md` and `~/.claude/skills/review/references/output-format.md`
-- model: opus
-- prompt: The SKILL.md content + "Save review to .pipeline/{project-name}/{task-slug}/review.md" + "Working directory: {cwd}"
-
-After completion, verify `.pipeline/{project-name}/{task-slug}/review.md` was created.
-
-```
-━━━ Review [완료] ━━━
+```bash
+# 예시 — 프로젝트에 맞게 자동 추론
+yarn tsc --noEmit
+yarn lint
 ```
 
-### Bugfix Agent
+- 둘 다 통과 → 4-5 진입
+- 실패 → 한 번 자동 수정 시도(원인 명확하면 bugfix lite). 그래도 실패면 sub-task 멈춤 + ✋ 사용자 보고
+- 명령어 자체가 없는 프로젝트는 게이트 건너뛰고 4-5 진입 (한 줄 노트로 review에 전달)
+
+#### 4-5. Multi-lens Review (병렬 dispatch)
+
+**여러 reviewer agent를 한 번의 메시지로 병렬 dispatch**한다. 각 lens는 자기 영역만 본다.
+
+기본 lens (항상):
+
+| Lens | 모델 | 시점 |
+|------|------|------|
+| code-quality | opus | 가독성, 네이밍, 중복, 함수 크기, 책임 분리, 죽은 코드 |
+| architecture | opus | 경계, 의존 방향, 책임 위치, 추상화 레벨, 결합도 |
+| security | opus | 입력 검증, secret 노출, injection, 권한, 직렬화 |
+| testability | sonnet | 테스트 누락, 깨지기 쉬운 테스트, edge case 미커버 |
+| conventions | sonnet | CLAUDE.md / 프로젝트 컨벤션 / 커밋 규칙 / 네이밍 규칙 준수 |
+
+선택 lens (감지 시 추가):
+- **performance** (sonnet): 변경 규모가 크거나, 명백한 비효율(N+1, 중복 호출, 동기 I/O)이 의심될 때
+- **도메인 lens**: 프로젝트 컨벤션에서 특수 lens가 필요할 때만 (예: FSD 프로젝트면 FSD-review). 기본 lens가 이미 코드 전체를 보므로 도메인 lens는 **보충용**이지 대체용이 아니다.
+
+**Dispatch 형식 (병렬)**:
+- 한 메시지에 여러 Task tool call을 동시에 넣는다
+- 각 agent prompt: Read `~/.claude/skills/review/SKILL.md` and `~/.claude/skills/review/references/output-format.md`
+- model: 위 표에 따름
+- 추가 지시: "당신은 **{lens}** 관점만 본다. 다른 lens는 다른 reviewer가 보고 있으니 중복 코멘트는 피하라." + "구현 변경 파일: .pipeline/{...}/changes-{N}.md 참고" + "결과: .pipeline/{...}/review-{N}-{lens}.md"
+
+**액션 아이템 포맷 (필수)**:
+각 review 파일은 액션 아이템을 아래 형식으로 작성하도록 prompt에 명시한다.
+
+```markdown
+### [SEVERITY] {짧은 제목}
+- **위치**: `path/to/file.ts:42`
+- **문제**: {무엇이 잘못됐는지}
+- **수정**: {어떻게 고쳐야 하는지 — 가능하면 diff 또는 코드 조각}
+- **이유**: {왜 고쳐야 하는지}
+```
+
+SEVERITY = `critical` | `major` | `minor`.
+
+**통합**:
+모든 review-{N}-{lens}.md를 읽어 `review-{N}.md`로 통합한다.
+- 중복 액션 아이템은 머지 (같은 file:line)
+- severity로 정렬
+- PASS 조건: **critical 0개 AND major 0개**
+
+#### 4-6. Bugfix → 재리뷰 루프 (최대 2회)
+
+PASS면 sub-task 종료. 아니면:
 
 ```
-━━━ Bugfix [진행 중] ━━━
+iteration = 0
+while iteration < 2:
+    iteration += 1
+    spawn Bugfix agent (sonnet):
+        - Read ~/.claude/skills/bugfix/SKILL.md
+        - prompt: SKILL.md + "Review: .pipeline/{...}/review-{N}.md" + "이전 iteration: {iteration-1}"
+    re-run Quality Gate (4-4)
+    re-run Multi-lens Review (4-5) → review-{N}-iter{iteration}.md
+    if PASS: break
+
+if not PASS:
+    잔여 critical/major를 final-report.md에 누적
+    ✋ 사용자 보고: "{sub-task N}: 2회 재리뷰 후 잔여 critical {M}건. 계속/중단?"
 ```
 
-Read `.pipeline/{project-name}/{task-slug}/review.md` first. If no actionable issues found, skip this agent.
+#### 4-7. Sub-task 종료
 
-Spawn Task agent:
-- Read `~/.claude/skills/bugfix/SKILL.md`
-- model: sonnet
-- prompt: The SKILL.md content + "Read review from .pipeline/{project-name}/{task-slug}/review.md" + "Working directory: {cwd}"
+- TaskUpdate: completed
+- 진척률 콘솔 출력: `[{done}/{total}] {title} 완료`
+- 다음 sub-task로 이동
 
-```
-━━━ Bugfix [완료] ━━━
-```
+### Failure Handling (자율 모드 중 멈춤 조건)
 
-## Step 5: Retrospective
+다음 경우에만 사용자에게 ✋ :
 
-```
-━━━ Retrospective [진행 중] ━━━
-```
+| 조건 | 옵션 제시 |
+|------|-----------|
+| Agent dispatch 실패 (2회 retry 후) | Retry / Skip / Abort |
+| Quality gate 자동 수정 실패 | Retry / Skip this sub-task / Abort |
+| 2회 재리뷰 후 잔여 critical | 잔여 무시하고 진행 / Skip / Abort |
+| Dependency 깨짐 (선행 sub-task가 Abort된 후 종속 sub-task 도달) | Skip dependent / Abort all |
 
-Spawn Task agent:
-- Read `~/.claude/skills/retrospective/SKILL.md`
-- model: sonnet
-- prompt: The SKILL.md content + "Read from and write to .pipeline/{project-name}/{task-slug}/" + "Working directory: {cwd}"
+그 외(major만 남은 PASS, minor 잔여, 일반 진행)에는 묻지 않는다.
 
-After completion, verify `.pipeline/{project-name}/{task-slug}/retrospective.md` was created.
+## Step 5: 종합 보고 + Retrospective
 
-```
-━━━ Retrospective [완료] ━━━
-```
-
-## Step 6: Final Report
+모든 sub-task 종료 후:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  Pipeline Complete ✓
+  Master Plan 완료 ✓
   Project: {project-name}
   Task: {task-slug}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Worktree: .worktrees/{task-slug}/
-Branch:   pipeline/{task-slug}
+Sub-tasks: {done}/{total}
+  ✓ 1. {title}  — {파일 N개 변경, review {clean / major M / 잔여 critical X}}
+  ✓ 2. {title}  — ...
+  ⊘ 5. {title}  — Skipped ({reason})
 
-Agents dispatched: {N}
-  ✓ Research    — .pipeline/{project-name}/{task-slug}/research.md
-  ✓ Plan        — .pipeline/{project-name}/{task-slug}/plan.md
-  ✓ Implement   — {N tasks completed}
-  ✓ Review      — .pipeline/{project-name}/{task-slug}/review.md
-  ✓ Bugfix      — {N issues fixed}
-  ✓ Retrospective — .pipeline/{project-name}/{task-slug}/retrospective.md
+집계:
+  • 총 변경 파일: {N}
+  • 재리뷰 반복 합계: {N}
+  • Quality gate 실패: {N}회
 
-→ 변경사항을 확인하고 메인 브랜치에 머지하세요:
-  cd .worktrees/{task-slug}
-  git add -A && git commit -m "feat: {task-slug}"
-  git checkout main
-  git merge pipeline/{task-slug}
-  git worktree remove .worktrees/{task-slug}
+잔여 이슈 (final-report.md):
+  • {있으면 표시 / 없으면 "없음"}
+
+📄 산출물:
+  master-plan.md, plan-*.md, review-*.md, retrospective.md
+
+→ 변경 사항을 검토하고 커밋하세요.
 ```
+
+Spawn Retrospective agent:
+- Read `~/.claude/skills/retrospective/SKILL.md`
+- model: sonnet
+- prompt: SKILL.md + "Workspace: .pipeline/{project-name}/{task-slug}/" + "Master plan과 모든 sub-task 산출물을 분석하라"
+- output: `retrospective.md`
+
+## User Overrides (승인 게이트 외)
+
+사용자가 명시적으로 지시하면 따른다 (사용자 지시 우선):
+
+- **"수동 모드로"** → 각 sub-task 종료 시 게이트 추가
+- **"리서치 없이"** → 모든 sub-task의 Research를 N으로 강제
+- **"lens 추가/제거: {lens}"** → review lens 조정
+- **"sub-task {N}만"** → 해당 sub-task만 실행
+- **"여기서 멈춰"** → 현재 sub-task까지 완료 후 종료
+- **"건너뛰어"** → 현재 sub-task만 Skip 처리
 
 ## Rules
 
-- ALWAYS use the Task tool to dispatch agents — never execute their work directly in this session
-- Each agent MUST run as an isolated subprocess (separate context)
-- **모든 에이전트는 worktree 경로에서 작업해야 한다** — 메인 working directory에서 직접 작업하지 않는다
-- Pass artifacts via `.pipeline/{project-name}/{task-slug}/` files only — no shared context
-- Verify each agent's output artifact exists before proceeding to the next agent
-- If an agent fails, report the error and ask the user: Retry / Skip / Abort
+- ALWAYS use the Task tool to dispatch agents — never execute their work directly
+- Each agent runs in an **isolated subprocess** (separate context)
+- Pass artifacts via `.pipeline/{project-name}/{task-slug}/` files only
+- Verify each agent's output artifact exists before proceeding
+- **Multi-lens review agents MUST be dispatched in parallel** (single message, multiple Task calls)
 - Do NOT commit changes — let the user decide when to commit
-- Do NOT remove the worktree — let the user review and merge
-- Write all output in the same language the user has been using in the conversation
-- When reading SKILL.md files to pass to agents, read the FULL content and pass it as-is in the prompt
+- Write all output in the same language the user has been using
+- When reading SKILL.md files, read the FULL content and pass it as-is in the prompt
+- 최대 sub-task 수: 8 (초과 시 phase 분리 제안)
+- 최대 재리뷰 iteration: 2
+- 자율 모드 중에는 위 Failure Handling 조건 외 사용자 입력 없이 진행
