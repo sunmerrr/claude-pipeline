@@ -201,7 +201,7 @@ yarn lint
 | code-quality | opus | 가독성, 네이밍, 중복, 함수 크기, 책임 분리, 죽은 코드 |
 | architecture | opus | 경계, 의존 방향, 책임 위치, 추상화 레벨, 결합도 |
 | security | opus | 입력 검증, secret 노출, injection, 권한, 직렬화 |
-| testability | sonnet | 테스트 누락, 깨지기 쉬운 테스트, edge case 미커버 |
+| testability | sonnet | **현재 코드의 구조적 테스트 가능성만** (factory DI 부재, 모듈 전역 상태 누적 등). 테스트 자체 부재나 "미래에 테스트 도입 시 어려울 수 있음"은 major/critical 금지 — 모두 minor 이하 |
 | conventions | sonnet | CLAUDE.md / 프로젝트 컨벤션 / 커밋 규칙 / 네이밍 규칙 준수 |
 
 선택 lens (감지 시 추가):
@@ -229,7 +229,7 @@ SEVERITY = `critical` | `major` | `minor`.
 
 **통합**:
 모든 review-{N}-{lens}.md를 읽어 `review-{N}.md`로 통합한다.
-- 중복 액션 아이템은 머지 (같은 file:line)
+- **중복 머지 강제**: 동일 `file:line` 이거나 동일 코드 문제를 여러 lens가 잡으면 **한 항목으로 머지**한다. severity는 잡은 lens 중 **가장 높은 것**으로 채택. 머지된 항목은 어떤 lens들이 잡았는지 라벨로 명시 (예: `[major] (architecture + testability)`)
 - severity로 정렬
 - PASS 조건: **critical 0개 AND major 0개**
 
