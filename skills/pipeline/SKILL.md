@@ -167,6 +167,7 @@ Sub-tasks ({N}개):
 - Read `~/.claude/skills/plan/SKILL.md`
 - model: opus
 - prompt: SKILL.md 내용 + "Master plan은 .pipeline/{...}/master-plan.md에 있다. 이 sub-task({N}: {title})의 plan-{N}.md를 작성하라." + "Research가 있으면 .pipeline/{...}/research-{N}.md를 참조하라." + "Working directory: {cwd}"
+- **추가 지시**: "신규 라이브러리/CLI 도구의 동작 가정(예: 경로 해석 기준, 옵션 우선순위, 환경변수 처리 순서 등)을 docs 확인 없이 추측으로 작성하지 말 것. 불확실한 부분은 plan에 '검증 필요' 태그를 남기거나, research-{N}.md가 없다면 사용자에게 research 단계 추가를 제안하라. 잘못된 mental model이 plan에 박히면 implement/review가 모두 그 위에서 돌아가 silent fail 가능성이 커진다."
 - verify: `plan-{N}.md` 생성됨
 
 #### 4-3. Implement
@@ -234,6 +235,10 @@ SEVERITY = `critical` | `major` | `minor`.
 - PASS 조건: **critical 0개 AND major 0개**
 
 #### 4-6. Bugfix → 재리뷰 루프 (최대 2회)
+
+**Scope boundary**: bugfix agent는 현재 sub-task가 명시한 파일 경계(plan-{N}.md의 `files:` 또는 changes-{N}.md) **내에서만** 수정한다. 다른 sub-task의 영역(예: ST5인데 `server/` 디렉토리)에는 손대지 않는다. 단 cross-cutting fix가 필요하면:
+1. review-{N}.md DEFER 섹션에 명시하고 후속 sub-task / backlog로 이월하거나
+2. bugfix prompt에 **명시적 cross-cutting 지시**(어떤 파일을, 왜)를 박아두는 경우에만 예외 허용.
 
 PASS면 sub-task 종료. 아니면:
 
