@@ -63,6 +63,10 @@ Master plan 품질이 자율 루프의 안전성을 결정한다. 모호한 부�
 
 `.pipeline/{project-name}/{task-slug}/master-plan.md`를 작성한다.
 
+### Backlog 참조 (있으면)
+
+`.pipeline/{project-name}/backlog.md`가 존재하면 먼저 읽고, 이번 master plan에 흡수할 항목이 있는지 검토한다 (이전 master plan들이 DEFER로 남긴 잔여 작업). 흡수하지 않은 항목은 backlog에 그대로 유지.
+
 ### 필수 섹션
 
 ```markdown
@@ -312,6 +316,19 @@ Spawn Retrospective agent:
 - model: sonnet
 - prompt: SKILL.md + "Workspace: .pipeline/{project-name}/{task-slug}/" + "Master plan과 모든 sub-task 산출물을 분석하라"
 - output: `retrospective.md`
+
+### Backlog 누적
+
+모든 sub-task의 `review-N.md` DEFER 섹션 + `review-N-iter*.md`에 남은 잔여 minor를 모아 **`.pipeline/{project-name}/backlog.md`** (프로젝트 루트, master plan 간 공유)에 누적한다.
+
+- 형식: 항목별로 출처 sub-task, severity, 한 줄 설명, 발견 시점(완료된 master plan 이름).
+- 기존 backlog.md가 있으면 **append + dedupe** (같은 file:line 동일 문제는 중복 추가 안 함).
+- 다음 master plan은 Step 2에서 이 backlog를 입력으로 사용 → 매 cycle마다 silent loss 방지.
+
+종합 보고에 backlog 요약 한 줄 추가:
+```
+📋 Backlog: 신규 +{M} / 누적 {N}건 → .pipeline/{project-name}/backlog.md
+```
 
 ## User Overrides (승인 게이트 외)
 
