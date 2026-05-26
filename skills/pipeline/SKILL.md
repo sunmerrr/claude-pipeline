@@ -341,6 +341,23 @@ Spawn Retrospective agent:
 - **"여기서 멈춰"** → 현재 sub-task까지 완료 후 종료
 - **"건너뛰어"** → 현재 sub-task만 Skip 처리
 
+## Embedded Mode (from `/program`)
+
+상위 `/program` skill이 이 pipeline을 마일스톤 단위로 호출할 때 사용하는 모드.
+
+**트리거**: prompt에 `EMBEDDED_MODE: true` 시그널 + workspace 경로(`.pipeline/{project}/{program-slug}/milestone-{M}/`) + 미리 작성된 `master-plan.md`가 함께 전달되면 embedded 모드로 진입.
+
+**동작 변경**:
+- Step 0 (명확화) **건너뜀** — program 단계에서 이미 합의됨
+- Step 1 (프로젝트/태스크 식별) **건너뜀** — workspace 경로가 prompt로 전달됨
+- Step 2 (Master Plan 작성) **건너뜀** — 이미 작성되어 있음
+- Step 3 (✋ 사용자 승인 게이트) **건너뜀** — program 단계에서 마일스톤 게이트로 이미 받음
+- **Step 4 자율 실행 루프부터 시작**
+- Step 5 종합 보고는 출력하되 **Retrospective dispatch는 건너뜀** — program이 모든 마일스톤 완료 후 종합 retrospective를 1회 dispatch
+- Backlog 누적은 그대로 수행 (`.pipeline/{project}/backlog.md`)
+
+**복귀**: 모든 sub-task 완료 + Step 5 보고 후 program으로 control 반환. 마일스톤 단위 산출물(plan-*.md, review-*.md, changes-*.md 등)은 milestone workspace 안에 그대로 둠.
+
 ## Rules
 
 - ALWAYS use the Task tool to dispatch agents — never execute their work directly
