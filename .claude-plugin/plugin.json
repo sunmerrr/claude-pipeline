@@ -1,7 +1,7 @@
 {
   "name": "claude-pipeline",
-  "version": "1.0.0",
-  "description": "AI development pipeline with specialized agents — research, plan, implement, review, bugfix, and retrospective",
+  "version": "1.1.0",
+  "description": "AI development pipeline. /pipeline for a single master plan, /program for vision-level orchestration across multiple milestones.",
   "author": {
     "name": "sunmerrr"
   },
